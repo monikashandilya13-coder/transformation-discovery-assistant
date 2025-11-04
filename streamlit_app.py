@@ -12,26 +12,7 @@ import os, sys, subprocess, shutil, pathlib
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"                  # -> ./.local-browsers
 os.environ.setdefault("HOME", str(pathlib.Path.cwd()))        # avoid writes in /home/adminuser/venv
 
-PW_CACHE = pathlib.Path.home() / ".cache" / "ms-playwright"
-LOCAL_BROWSERS = pathlib.Path(".local-browsers")
 
-def _ensure_pw():
-    # wipe stale cache that points to headless_shell path
-    suspicious = PW_CACHE.exists() and not any(
-        (d / "chrome-linux" / "headless_shell").exists()
-        for d in PW_CACHE.glob("chromium_headless_shell-*")
-    )
-    if suspicious:
-        try: shutil.rmtree(PW_CACHE)
-        except Exception: pass
-
-    # install if local browsers dir missing
-    if not LOCAL_BROWSERS.exists():
-        env = {**os.environ, "PLAYWRIGHT_BROWSERS_PATH": "0", "HOME": str(pathlib.Path.cwd())}
-        subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"],
-                       check=True, env=env)
-
-_ensure_pw()
 
 from playwright.sync_api import sync_playwright
 # --- End guard ---
