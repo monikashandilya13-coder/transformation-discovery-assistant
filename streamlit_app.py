@@ -292,10 +292,16 @@ with tab_discovery:
 
             status = st.status("Starting…")
             try:
-                # Login (optional)
-                if username and password:
-                    status.update(label="Logging in…")
-                    await try_login(start_url, username, password)
+               # Login (optional)
+if username and password:
+    status.update(label="Logging in…")
+    success, final_url = asyncio.run(try_login(start_url, username, password))
+    if not success:
+        st.warning(f"Login failed. Proceeding from {final_url}")
+    else:
+        st.success(f"Logged in! Starting from {final_url}")
+else:
+    final_url = start_url
 
                 seed = page.url
                 status.update(label="Craw crawler…")
