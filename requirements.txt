@@ -2,3 +2,4 @@ streamlit
 playwright>=1.40.0
 requests
 tiktoken
+-e git+https://github.com/microsoft/playwright-python.git@v1.40.0#egg=playwright
