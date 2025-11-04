@@ -6,54 +6,41 @@ from typing import Dict, Any, List
 
 import streamlit as st
 
-# --- Playwright Cloud Guard (put this at the VERY TOP) ---
-import os, sys, subprocess, shutil, pathlib
+# --- Playwright Cloud Guard (force install + show logs) ---
+import os, sys, subprocess, shutil, pathlib, textwrap
+os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "0")  # install into ./.local-browsers
 
-# Install browsers into the app dir (more reliable on Streamlit Cloud)
-os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "0")  # => ./.local-browsers
+LOCAL_BROWSERS = pathlib.Path(".local-browsers")
 
-PW_CACHE = pathlib.Path.home() / ".cache" / "ms-playwright"
-
-def _ensure_pw():
-    # 1) Clear stale cache if Chromium headless shell missing
-    suspicious = False
-    if PW_CACHE.exists():
-        candidates = list(PW_CACHE.glob("chromium_headless_shell-*"))
-        if not candidates:
-            suspicious = True
-        else:
-            ok = any((c / "chrome-linux" / "headless_shell").exists() for c in candidates)
-            if not ok:
-                suspicious = True
-    if suspicious:
+def _force_install_chromium():
+    # If browsers dir missing, run install and print logs
+    if not LOCAL_BROWSERS.exists():
+        cmd = [sys.executable, "-m", "playwright", "install", "chromium"]
         try:
-            shutil.rmtree(PW_CACHE)
-        except Exception:
-            pass  # best effort
-
-    # 2) Ensure Playwright browser is installed (into PLAYWRIGHT_BROWSERS_PATH=0)
-    try:
-        from playwright._impl._driver import compute_driver_executable
-        compute_driver_executable()  # raises if driver/browsers not ready
-    except Exception:
-        try:
-            subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
-        except Exception:
+            out = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            # Optional: show short success note
             try:
-                subprocess.run([sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"], check=True)
-            except Exception as e:
-                # Show helpful error in the app UI (non-fatal)
-                try:
-                    import streamlit as st
-                    st.error(f"Playwright Chromium install failed: {e}")
-                except Exception:
-                    pass
+                import streamlit as st
+                st.write("Playwright install stdout:", out.stdout[-500:] or "(ok)")
+            except Exception:
+                pass
+        except subprocess.CalledProcessError as e:
+            # Surface error text in the UI so we can see why it failed
+            try:
+                import streamlit as st
+                st.error("Playwright install failed")
+                st.code((e.stdout or "") + "\n" + (e.stderr or ""), language="bash")
+            except Exception:
+                pass
+            # Re-raise to stop early so you see the real reason
+            raise
 
-_ensure_pw()
+_force_install_chromium()
 
-# Safe to import Playwright now
+# Safe to import now
 from playwright.sync_api import sync_playwright
 # --- End guard ---
+
 import streamlit as st, pathlib
 st.write("PLAYWRIGHT_BROWSERS_PATH:", os.getenv("PLAYWRIGHT_BROWSERS_PATH"))
 st.write("Local browsers dir exists:", pathlib.Path('.local-browsers').exists())
