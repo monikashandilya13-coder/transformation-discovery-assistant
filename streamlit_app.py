@@ -13,7 +13,7 @@ if not BROWSER_DIR.exists():
     st.warning("Installing Playwright Chromium (first run only)…")
     try:
         result = subprocess.run(
-            [sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"],
+            [sys.executable, "-m", "playwright", "install", "chromium"],
             capture_output=True,
             text=True,
             check=True
