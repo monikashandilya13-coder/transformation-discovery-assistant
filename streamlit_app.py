@@ -5,16 +5,16 @@ from typing import Dict, Any, List
 import os, pathlib, subprocess, sys
 import streamlit as st
 
-# --- PLAYWRIGHT: Browser installed during build ---
+# --- PLAYWRIGHT: Installed during pip install ---
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
 BROWSER_DIR = pathlib.Path(".local-browsers")
 
-st.write("**Playwright Status:**")
-st.write(f"Browser dir: `{BROWSER_DIR}`")
+st.write("**Playwright Debug:**")
+st.write(f"Dir: `{BROWSER_DIR}`")
 st.write(f"Exists: `{BROWSER_DIR.exists()}`")
 
 if not BROWSER_DIR.exists():
-    st.error("Playwright browser not found. Build failed. See logs.")
+    st.error("Browser not found. Build failed. Check logs.")
     st.stop()
 
 st.success("Playwright ready!")
