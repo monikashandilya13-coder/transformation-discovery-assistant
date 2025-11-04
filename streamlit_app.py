@@ -5,28 +5,17 @@ from typing import Dict, Any, List
 import os, pathlib, subprocess, sys
 import streamlit as st
 
-# --- PLAYWRIGHT INSTALL (runs only once) ---
+# --- PLAYWRIGHT: Browser installed during build ---
 os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
 BROWSER_DIR = pathlib.Path(".local-browsers")
 
+st.write("**Playwright Status:**")
+st.write(f"Browser dir: `{BROWSER_DIR}`")
+st.write(f"Exists: `{BROWSER_DIR.exists()}`")
+
 if not BROWSER_DIR.exists():
-    st.warning("Installing Playwright Chromium (first run only)…")
-    try:
-        result = subprocess.run(
-            [sys.executable, "-m", "playwright", "install", "chromium"],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        st.success("Chromium installed!")
-        st.code("Download complete. Browser ready.")
-    except subprocess.CalledProcessError as e:
-        st.error("Install failed. Full error:")
-        st.code(e.stderr)
-        st.stop()
-    except Exception as e:
-        st.error(f"Unexpected error: {e}")
-        st.stop()
+    st.error("Playwright browser not found. Build failed. See logs.")
+    st.stop()
 
 st.success("Playwright ready!")
 from playwright.sync_api import sync_playwright
