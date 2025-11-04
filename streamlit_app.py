@@ -6,7 +6,7 @@ import streamlit as st
 import requests
 
 # --- Playwright Setup (NO RUNTIME INSTALL) ---
-os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
+#os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
 LOCAL_BROWSERS = pathlib.Path(".local-browsers")
 
 if not LOCAL_BROWSERS.exists():
