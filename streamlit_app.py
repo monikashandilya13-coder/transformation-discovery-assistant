@@ -5,26 +5,60 @@ from collections import deque
 from typing import Dict, Any, List
 
 import streamlit as st
-from playwright.sync_api import sync_playwright
 
-# --- Optional runtime guard: install Chromium if missing ---
-def _ensure_playwright_browser():
+# --- Playwright Cloud Guard (put this at the VERY TOP) ---
+import os, sys, subprocess, shutil, pathlib
+
+# Install browsers into the app dir (more reliable on Streamlit Cloud)
+os.environ.setdefault("PLAYWRIGHT_BROWSERS_PATH", "0")  # => ./.local-browsers
+
+PW_CACHE = pathlib.Path.home() / ".cache" / "ms-playwright"
+
+def _ensure_pw():
+    # 1) Clear stale cache if Chromium headless shell missing
+    suspicious = False
+    if PW_CACHE.exists():
+        candidates = list(PW_CACHE.glob("chromium_headless_shell-*"))
+        if not candidates:
+            suspicious = True
+        else:
+            ok = any((c / "chrome-linux" / "headless_shell").exists() for c in candidates)
+            if not ok:
+                suspicious = True
+    if suspicious:
+        try:
+            shutil.rmtree(PW_CACHE)
+        except Exception:
+            pass  # best effort
+
+    # 2) Ensure Playwright browser is installed (into PLAYWRIGHT_BROWSERS_PATH=0)
     try:
         from playwright._impl._driver import compute_driver_executable
-        import subprocess, sys
-        # If driver isn't there, this will raise; fall back to install
-        _ = compute_driver_executable()
+        compute_driver_executable()  # raises if driver/browsers not ready
     except Exception:
         try:
-            # Lightweight install (no system deps); depends on image having libs already
             subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
         except Exception:
-            pass  # Last resort: rely on postBuild
-try:
-    _ensure_playwright_browser()
-except Exception:
-    pass
-# --- End runtime guard ---
+            try:
+                subprocess.run([sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"], check=True)
+            except Exception as e:
+                # Show helpful error in the app UI (non-fatal)
+                try:
+                    import streamlit as st
+                    st.error(f"Playwright Chromium install failed: {e}")
+                except Exception:
+                    pass
+
+_ensure_pw()
+
+# Safe to import Playwright now
+from playwright.sync_api import sync_playwright
+# --- End guard ---
+import streamlit as st, pathlib
+st.write("PLAYWRIGHT_BROWSERS_PATH:", os.getenv("PLAYWRIGHT_BROWSERS_PATH"))
+st.write("Local browsers dir exists:", pathlib.Path('.local-browsers').exists())
+st.write("ms-playwright cache exists:", (pathlib.Path.home()/'.cache/ms-playwright').exists())
+
 
 # Optional token counting for future
 try:
