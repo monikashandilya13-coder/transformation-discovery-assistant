@@ -7,6 +7,25 @@ from typing import Dict, Any, List
 import streamlit as st
 from playwright.sync_api import sync_playwright
 
+# --- Optional runtime guard: install Chromium if missing ---
+def _ensure_playwright_browser():
+    try:
+        from playwright._impl._driver import compute_driver_executable
+        import subprocess, sys
+        # If driver isn't there, this will raise; fall back to install
+        _ = compute_driver_executable()
+    except Exception:
+        try:
+            # Lightweight install (no system deps); depends on image having libs already
+            subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+        except Exception:
+            pass  # Last resort: rely on postBuild
+try:
+    _ensure_playwright_browser()
+except Exception:
+    pass
+# --- End runtime guard ---
+
 # Optional token counting for future
 try:
     import tiktoken  # noqa
