@@ -5,16 +5,28 @@ from typing import Dict, Any, List
 import streamlit as st
 import requests
 
-# --- Playwright Setup (NO RUNTIME INSTALL) ---
-#os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
-LOCAL_BROWSERS = pathlib.Path(".local-browsers")
+# ---------- PLAYWRIGHT INSTALL (runs only once) ----------
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"          # → .local-browsers
+BROWSER_DIR = pathlib.Path(".local-browsers")
 
-if not LOCAL_BROWSERS.exists():
-    st.error("Playwright browsers not found. Build failed.")
-    st.stop()
+if not BROWSER_DIR.exists():
+    st.warning("Installing Playwright Chromium (first run only)…")
+    try:
+        subprocess.run(
+            [sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        st.success("Chromium installed!")
+    except Exception as e:
+        st.error("Failed to install Chromium. Check logs.")
+        st.code(str(e))
+        st.stop()
 
-st.success("Playwright ready")
+st.success("Playwright ready!")
 from playwright.sync_api import sync_playwright
+# -------------------------------------------------------
 
 # Optional
 try:
