@@ -1,3 +1,2 @@
 #!/usr/bin/env bash
-# Ensure Playwright browsers (Chromium) are installed on deploy
 python -m playwright install chromium
