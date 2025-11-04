@@ -1,11 +1,4 @@
-
----
-
-### 📂 Full File List (Copy-Paste Ready)
-
-#### `streamlit_app.py`
-```python
-import os, re, time, json, tempfile, io, csv, zipfile, pathlib, shutil, sys, subprocess
+import os, re, time, json, tempfile, io, csv, zipfile, pathlib
 from urllib.parse import urljoin, urlparse, urldefrag
 from collections import deque
 from typing import Dict, Any, List
@@ -13,27 +6,24 @@ import streamlit as st
 import requests
 
 # --- Playwright Setup (NO RUNTIME INSTALL) ---
-os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"  # Uses .local-browsers
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
 LOCAL_BROWSERS = pathlib.Path(".local-browsers")
 
 if not LOCAL_BROWSERS.exists():
-    st.error("❌ Playwright browsers not found. Build failed. Check logs.")
+    st.error("Playwright browsers not found. Build failed.")
     st.stop()
 
-st.success("✅ Playwright browsers ready in `.local-browsers`")
-st.write("Browsers path:", os.getenv("PLAYWRIGHT_BROWSERS_PATH"))
-st.write("Browser dir exists:", LOCAL_BROWSERS.exists())
-
+st.success("Playwright ready")
 from playwright.sync_api import sync_playwright
 
-# Optional token counting
+# Optional
 try:
     import tiktoken
 except Exception:
     tiktoken = None
 
-st.set_page_config(page_title="Transformation Discovery Assistant", page_icon="🧭", layout="wide")
-st.title("🧭 Transformation Discovery Assistant — Discovery + Q&A")
+st.set_page_config(page_title="Transformation Discovery Assistant", page_icon="Compass", layout="wide")
+st.title("Transformation Discovery Assistant — Discovery + Q&A")
 
 with st.expander("Read me (Security, Legal, Limits)"):
     st.markdown("""
@@ -44,23 +34,6 @@ with st.expander("Read me (Security, Legal, Limits)"):
 - SSO/MFA not supported by default.
 """)
 
-# ------------------ Selector Profile Support ------------------
-def load_selector_profile(file_bytes: bytes) -> Dict[str, Any]:
-    try:
-        prof = json.loads(file_bytes.decode("utf-8"))
-        keys = {k.lower(): k for k in prof.keys()}
-        def get(k): return prof.get(keys.get(k, k))
-        return {
-            "login_url": get("login_url") or "",
-            "username_sel": get("username") or get("username_sel") or "",
-            "password_sel": get("password") or get("password_sel") or "",
-            "submit_sel": get("submit") or get("submit_sel") or "",
-            "post_login_indicator": get("post_login_indicator") or get("post_login_selector") or "",
-        }
-    except Exception as e:
-        st.error(f"Invalid selector profile JSON: {e}")
-        return {}
-
 # ------------------ Helpers ------------------
 def normalize_link(current_url, href):
     if not href: return None
@@ -70,8 +43,7 @@ def normalize_link(current_url, href):
 
 def same_origin(u1, u2):
     p1, p2 = urlparse(u1), urlparse(u2)
-    def norm_port(p):
-        return p.port or (80 if p.scheme == "http" else 443)
+    def norm_port(p): return p.port or (80 if p.scheme == "http" else 443)
     return (p1.scheme, p1.hostname, norm_port(p1)) == (p2.scheme, p2.hostname, norm_port(p2))
 
 def path_prefix(u):
@@ -96,17 +68,13 @@ USER_HEUR = ['input[name="username"]','input[id="username"]','input[name*="user"
 PASS_HEUR = ['input[type="password"]','input[name*="pass"]','input[id*="pass"]']
 SUBM_HEUR = ['button[type="submit"]','input[type="submit"]','button[name*="login"]','button[id*="login"]']
 
-def try_login(page, start_url, username, password, user_sel=None, pass_sel=None, submit_sel=None, indicator=None, nav_timeout:int=10000):
-    target = start_url
-    ok, err = navigate_with_retries(page, target, wait_ms=400, retries=1, nav_timeout=nav_timeout)
+def try_login(page, start_url, username, password, user_sel=None, pass_sel=None, submit_sel=None, indicator=None, nav_timeout=10000):
+    ok, err = navigate_with_retries(page, start_url, wait_ms=400, retries=1, nav_timeout=nav_timeout)
     if not ok: return False, page.url
-
-    if not (username and password):
-        return False, page.url
+    if not (username and password): return False, page.url
 
     def safe_fill(sel, val):
-        try:
-            page.fill(sel, val); return True
+        try: page.fill(sel, val); return True
         except Exception: return False
 
     filled_u = filled_p = False
@@ -149,11 +117,8 @@ def try_login(page, start_url, username, password, user_sel=None, pass_sel=None,
                 except Exception: pass
 
     if indicator:
-        try:
-            page.wait_for_selector(indicator, timeout=nav_timeout)
-        except Exception:
-            pass
-
+        try: page.wait_for_selector(indicator, timeout=nav_timeout)
+        except Exception: pass
     page.wait_for_timeout(800)
     return True, page.url
 
@@ -163,8 +128,7 @@ def clean_visible_text(page):
         try:
             for el in page.query_selector_all(sel):
                 page.evaluate("(n)=>n.remove()", el)
-        except Exception:
-            pass
+        except Exception: pass
     heads = []
     for tag in ["h1","h2","h3","h4","h5","h6"]:
         try:
@@ -174,8 +138,7 @@ def clean_visible_text(page):
         except Exception: pass
     try:
         body = (page.inner_text("body") or "").strip()
-    except Exception:
-        body = ""
+    except Exception: body = ""
     body = re.sub(r"[ \t]+"," ", body)
     body = re.sub(r"\n{2,}", "\n", body)
     return "\n".join(heads) + "\n\n" + body
@@ -185,14 +148,12 @@ def crawl(context, seed_url, max_pages, wait_ms, same_path_only, capture_screens
     seen = set([seed_url])
     q = deque([seed_url])
     start_prefix = path_prefix(seed_url)
-
     page = context.new_page()
     url_status = {}
     def on_resp(r):
         try: url_status[r.url] = r.status
         except Exception: pass
     page.on("response", on_resp)
-
     count = 0
     while q and count < max_pages:
         cur = q.popleft()
@@ -210,11 +171,9 @@ def crawl(context, seed_url, max_pages, wait_ms, same_path_only, capture_screens
             text = clean_visible_text(page)[:200000]
             if capture_screens:
                 shot_bytes = page.screenshot(full_page=True)
-        except Exception as e:
-            pass
+        except Exception: pass
         results.append({"url": cur, "status": status, "title": title, "screenshot": shot_bytes, "error": None, "text": text})
         count += 1
-
         try:
             anchors = page.query_selector_all("a[href]")
             for a in anchors:
@@ -230,230 +189,4 @@ def crawl(context, seed_url, max_pages, wait_ms, same_path_only, capture_screens
 
 # ------------------ LLM Q&A ------------------
 def redact(text: str) -> str:
-    text = re.sub(r"[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}", "[REDACTED_EMAIL]", text)
-    text = re.sub(r"(?:api|secret|token|key)[=:]\s*[A-Za-z0-9_\-]{12,}", r"\1=[REDACTED]", text, flags=re.I)
-    text = re.sub(r"\b[0-9]{12,}\b", "[REDACTED_LONG_ID]", text)
-    return text
-
-def build_prompt(page_url: str, page_title: str, chunk_text: str, mode: str = "both") -> str:
-    instr = f"""
-You create high-value questions for modernization planning.
-
-Page URL: {page_url}
-Title: {page_title or "Untitled"}
-
-Content snippet:
->>> {chunk_text[:4000]} <<<
-
-Tasks:
-1) DOMAIN QUESTIONS — purpose, actors, rules, data fields, KPIs, edge cases.
-2) TECHNICAL QUESTIONS — UI behavior, validations, accessibility, state, performance, APIs, roles, i18n, security.
-
-Output JSON:
-{{
-  "domain_questions": [{{"q":"...","answer_hint":"...","difficulty":"Easy|Medium|Hard","tags":["business","rules"]}}],
-  "technical_questions": [{{"q":"...","answer_hint":"...","difficulty":"Easy|Medium|Hard","tags":["api","validation"]}}]
-}}
-
-Rules:
-- 8–12 concise questions per section (skip if little signal).
-- Prefer why/how/what-if questions that influence migration decisions.
-"""
-    if mode == "domain": instr += "\nOnly domain_questions; set technical_questions to []."
-    if mode == "technical": instr += "\nOnly technical_questions; set domain_questions to []."
-    return instr
-
-def call_grok(prompt: str, api_key: str, model: str = "grok-2-latest", max_tokens: int = 1200, temperature: float = 0.3):
-    url = os.getenv("XAI_API_BASE", "https://api.x.ai/v1/chat/completions")
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    payload = {
-        "model": model,
-        "messages": [{"role":"system","content":"You are a precise analyst."},{"role":"user","content":prompt}],
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-        "stream": False,
-    }
-    r = requests.post(url, headers=headers, json=payload, timeout=60)
-    if r.status_code != 200:
-        raise RuntimeError(f"Grok error {r.status_code}: {r.text[:200]}")
-    data = r.json()
-    text = data.get("choices",[{}])[0].get("message",{}).get("content","")
-    m = re.search(r"\{[\s\S]*\}$", text.strip())
-    if not m: return {"domain_questions": [], "technical_questions": []}
-    try:
-        return json.loads(m.group(0))
-    except Exception:
-        return {"domain_questions": [], "technical_questions": []}
-
-def rough_chunk(text: str, max_chars: int = 8000, overlap: int = 800) -> List[str]:
-    if len(text) <= max_chars: return [text]
-    out = []; i = 0
-    while i < len(text):
-        out.append(text[i:i+max_chars])
-        i += (max_chars - overlap)
-    return out
-
-def generate_qna_for_page(record: Dict[str, Any], api_key: str, model: str, mode: str):
-    txt = redact(record.get("text",""))
-    chunks = rough_chunk(txt, max_chars=8000, overlap=800)
-    agg = {"domain_questions": [], "technical_questions": []}
-    for ch in chunks:
-        out = call_grok(build_prompt(record["url"], record.get("title",""), ch, mode), api_key=api_key, model=model)
-        for k in ["domain_questions","technical_questions"]:
-            if out.get(k): agg[k].extend(out[k])
-        time.sleep(0.2)
-    def dedup(lst):
-        seen = set(); res = []
-        for it in lst:
-            q = (it.get("q","").strip()).lower()
-            if q and q not in seen:
-                seen.add(q); res.append(it)
-        return res[:12]
-    agg["domain_questions"] = dedup(agg["domain_questions"])
-    agg["technical_questions"] = dedup(agg["technical_questions"])
-    return agg
-
-# ------------------ UI ------------------
-tab_discovery, tab_qna = st.tabs(["🔎 Discovery", "🧠 Q&A Generator"])
-
-with tab_discovery:
-    st.subheader("Discovery (Crawl + Screenshots + CSV/JSON)")
-
-    prof_file = st.file_uploader("Selector Profile (JSON)", type=["json"])
-    profile = {}
-    if prof_file:
-        profile = load_selector_profile(prof_file.read())
-
-    with st.form("disc_form"):
-        start_url = st.text_input("Start URL", value=profile.get("login_url",""))
-        c1, c2 = st.columns(2)
-        with c1:
-            username = st.text_input("Username / Email", value="")
-        with c2:
-            password = st.text_input("Password", type="password", value="")
-
-        st.markdown("**Selectors (optional):**")
-        s1, s2, s3, s4 = st.columns(4)
-        with s1:
-            user_sel = st.text_input("Username selector", value=profile.get("username_sel",""))
-        with s2:
-            pass_sel = st.text_input("Password selector", value=profile.get("password_sel",""))
-        with s3:
-            submit_sel = st.text_input("Submit selector", value=profile.get("submit_sel",""))
-        with s4:
-            post_login_indicator = st.text_input("Post-login indicator", value=profile.get("post_login_indicator",""))
-
-        st.markdown("**Scan Options**")
-        o1, o2, o3 = st.columns(3)
-        with o1:
-            max_pages = st.number_input("Max pages", 1, 100, 20, 1)
-        with o2:
-            wait_ms = st.number_input("Wait after nav (ms)", 0, 10000, 500, 100)
-        with o3:
-            nav_timeout = st.number_input("Nav timeout (ms)", 2000, 60000, 12000, 1000)
-        screenshot = st.checkbox("Screenshots", value=True)
-        same_path_only = st.checkbox("Restrict to same path prefix", value=False)
-
-        consent = st.checkbox("I am authorized to scan this site.", value=False)
-        run_disc = st.form_submit_button("Run Discovery")
-
-        if run_disc:
-            if not consent:
-                st.error("Authorization required.")
-                st.stop()
-            if not start_url.startswith(("http://","https://")):
-                st.error("Valid URL required.")
-                st.stop()
-
-            if screenshot and max_pages > 10:
-                st.warning("Screenshots disabled for >10 pages to save memory.")
-                screenshot = False
-
-            status = st.status("Starting browser…", expanded=False)
-            try:
-                with sync_playwright() as p:
-                    browser = p.chromium.launch(headless=True, args=["--no-sandbox"])
-                    context = browser.new_context()
-                    context.set_default_timeout(nav_timeout)
-
-                    page = context.new_page()
-                    status.update(label="Logging in…", state="running")
-                    try_login(page, start_url, username, password, user_sel or None, pass_sel or None, submit_sel or None, post_login_indicator or None, nav_timeout=nav_timeout)
-
-                    seed = page.url
-                    status.update(label="Crawling…", state="running")
-                    results = crawl(context, seed, int(max_pages), int(wait_ms), bool(same_path_only), bool(screenshot))
-
-                    data = {
-                        "start_url": start_url,
-                        "crawl_seed": seed,
-                        "pages_crawled": len(results),
-                        "timestamp": int(time.time()),
-                        "results": results,
-                    }
-                    mem_zip = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
-                    with zipfile.ZipFile(mem_zip.name, "w", zipfile.ZIP_DEFLATED) as zf:
-                        zf.writestr("results.json", json.dumps(data, indent=2))
-                        buf = io.StringIO()
-                        cw = csv.writer(buf); cw.writerow(["url","status","title","screenshot","error"])
-                        for r in results: cw.writerow([r["url"], r.get("status",""), r.get("title",""), "Yes" if r.get("screenshot") else "No", r.get("error","")])
-                        zf.writestr("results.csv", buf.getvalue())
-                        for i, r in enumerate(results):
-                            if r.get("screenshot"):
-                                safe = re.sub(r'[^a-zA-Z0-9_\-]+','_', urlparse(r["url"]).path or "home")[:50] or "page"
-                                zf.writestr(f"screens/shot_{i}_{safe}.png", r["screenshot"])
-
-                    status.update(label="Done", state="complete")
-                    st.success(f"Discovery complete. Pages: {len(results)}")
-                    st.download_button("⬇️ Download ZIP", data=open(mem_zip.name,"rb").read(), file_name="discovery_results.zip", mime="application/zip")
-
-                    st.session_state["last_results"] = results
-                    try: context.close(); browser.close()
-                    except Exception: pass
-            except Exception as e:
-                status.update(label="Failed", state="error")
-                st.error(f"Discovery failed: {e}")
-
-with tab_qna:
-    st.subheader("Generate Q&A")
-    if "last_results" not in st.session_state:
-        st.info("Run Discovery first.")
-    else:
-        results = st.session_state["last_results"]
-        with st.form("qna_form"):
-            model = st.text_input("Grok model", value="grok-2-latest")
-            api_key = st.text_input("xAI API Key", type="password", value=os.getenv("XAI_API_KEY",""))
-            mode = st.selectbox("Mode", ["both","domain","technical"])
-            min_chars = st.number_input("Min text chars", 0, 20000, 500, 50)
-            submit_qna = st.form_submit_button("Generate Q&A")
-            if submit_qna:
-                if not api_key:
-                    st.error("API key required."); st.stop()
-                st.info("Generating…")
-                out_items = []
-                prog = st.progress(0)
-                for i, r in enumerate(results):
-                    if len(r.get("text","")) < int(min_chars):
-                        out_items.append({"url": r["url"], "title": r.get("title",""), "domain_questions": [], "technical_questions": [], "skipped": True})
-                        prog.progress((i+1)/len(results)); continue
-                    try:
-                        qna = generate_qna_for_page(r, api_key, model, mode)
-                        out_items.append({"url": r["url"], "title": r.get("title",""), **qna})
-                    except Exception as e:
-                        out_items.append({"url": r["url"], "title": r.get("title",""), "domain_questions": [], "technical_questions": [], "error": str(e)[:200]})
-                    prog.progress((i+1)/len(results))
-
-                qjson = {"generated_at": int(time.time()), "items": out_items}
-                csv_buf = io.StringIO(); cw = csv.writer(csv_buf)
-                cw.writerow(["url","title","section","question","answer_hint","difficulty","tags"])
-                for item in out_items:
-                    for sec in ["domain_questions","technical_questions"]:
-                        for q in item.get(sec, []):
-                            cw.writerow([item["url"], item["title"], "domain" if sec=="domain_questions" else "technical",
-                                         q.get("q",""), q.get("answer_hint",""), q.get("difficulty",""), ",".join(q.get("tags",[]))])
-                qzip = tempfile.NamedTemporaryFile(delete=False, suffix=".zip")
-                with zipfile.ZipFile(qzip.name, "w", zipfile.ZIP_DEFLATED) as zf:
-                    zf.writestr("questions.json", json.dumps(qjson, indent=2))
-                    zf.writestr("questions.csv", csv_buf.getvalue())
-                st.success("Q&A ready.")
-                st.download_button("⬇️ Download Q&A ZIP", data=open(qzip.name,"rb").read(), file_name="page_questions.zip", mime="application/zip")
+    text = re.sub(r"[
