@@ -1,4 +1,4 @@
-streamlit
-playwright
-requests
-tiktoken
+streamlit>=1.36
+playwright>=1.45
+requests>=2.31.0
+
