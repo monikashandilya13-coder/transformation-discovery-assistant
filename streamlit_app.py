@@ -2,32 +2,34 @@ import os, re, time, json, tempfile, io, csv, zipfile, pathlib
 from urllib.parse import urljoin, urlparse, urldefrag
 from collections import deque
 from typing import Dict, Any, List
+import os, pathlib, subprocess, sys
 import streamlit as st
-import subprocess, sys
-import requests
 
-# ---------- PLAYWRIGHT INSTALL (runs only once) ----------
-os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"          # → .local-browsers
+# --- PLAYWRIGHT INSTALL (runs only once) ---
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
 BROWSER_DIR = pathlib.Path(".local-browsers")
 
 if not BROWSER_DIR.exists():
     st.warning("Installing Playwright Chromium (first run only)…")
     try:
-        subprocess.run(
+        result = subprocess.run(
             [sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"],
-            check=True,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            capture_output=True,
+            text=True,
+            check=True
         )
         st.success("Chromium installed!")
+        st.code("Download complete. Browser ready.")
+    except subprocess.CalledProcessError as e:
+        st.error("Install failed. Full error:")
+        st.code(e.stderr)
+        st.stop()
     except Exception as e:
-        st.error("Failed to install Chromium. Check logs.")
-        st.code(str(e))
+        st.error(f"Unexpected error: {e}")
         st.stop()
 
 st.success("Playwright ready!")
 from playwright.sync_api import sync_playwright
-# -------------------------------------------------------
 
 # Optional
 try:
